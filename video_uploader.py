@@ -6,6 +6,7 @@ import asyncio
 import discord
 import ffmpeg
 import subprocess
+import logging
 
 # Discord bot setup
 intents = discord.Intents.default()
@@ -14,10 +15,28 @@ VIDEO_DIRECTORY  = r"C:\Users\YOUR_USERNAME\Videos\Captures"  # Change this to y
 DISCORD_BOT_TOKEN = "MY_BOT_TOKEN"  # Replace with your bot token
 DISCORD_CHANNEL_ID = MY_CHANNEL_ID  # Replace with your channel ID
 
+logger = logging.getLogger("discord_bot")
+logger.setLevel(logging.INFO)
 
+# Remove any existing handlers to avoid duplicate logs
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+# File handler (logs will be saved to 'bot.log')
+log_file = "bot.log"  # Change path if needed
+file_handler = logging.FileHandler(log_file)
+file_handler.setLevel(logging.INFO)
+
+# Log format
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add the file handler
+logger.addHandler(file_handler)
 
 def get_latest_video(directory):
     """Finds the most recently modified video file in the given directory."""
+    logger.info(f"Searching for the latest video in {directory}")
     video_extensions = (".mp4", ".mov", ".avi", ".mkv")
     videos = [
         os.path.join(directory, f)
@@ -25,12 +44,14 @@ def get_latest_video(directory):
         if f.lower().endswith(video_extensions)
     ]
     if not videos:
+        logger.info("No videos found in the directory.")
         return None
     return max(videos, key=os.path.getmtime)  # Get the most recently modified file
 
 
 def compress_video(video_full_path, output_file_name, target_size_kb):
     """Compresses the video to the target size."""
+    logger.info(f"Compressing video: {video_full_path}")
     try:
         min_audio_bitrate = 32000
         max_audio_bitrate = 256000
@@ -72,11 +93,11 @@ def compress_video(video_full_path, output_file_name, target_size_kb):
             output_file_name
         ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        print(f"✅ Video compressed successfully: {output_file_name}")
+        logger.info(f"Compressed video saved to {output_file_name}")
         return output_file_name
 
     except Exception as e:
+        logger.error(f"Error during compression: {str(e)}")
         print(f"❌ Error during compression: {str(e)}")
         return None
 
@@ -87,15 +108,18 @@ async def upload_to_discord(file_path):
     channel = client.get_channel(DISCORD_CHANNEL_ID)
 
     if not channel:
+        logger.error("Could not find Discord channel.")
         print("❌ Error: Could not find Discord channel.")
         return
 
     if not os.path.exists(file_path):
+        logger.error(f"File not found: {file_path}")
         print(f"❌ Error: File not found: {file_path}")
         return
 
     # Check if file is empty
     if os.path.getsize(file_path) == 0:
+        logger.error(f"File is empty: {file_path}")
         print(f"❌ Error: File is empty: {file_path}")
         return
 
@@ -103,6 +127,7 @@ async def upload_to_discord(file_path):
     last_modified_time = os.path.getmtime(file_path)
     time.sleep(5)
     if last_modified_time != os.path.getmtime(file_path):
+        logger.info(f"File is still being written: {file_path}")
         print(f"❌ File is still being written: {file_path}")
         return
 
@@ -117,12 +142,14 @@ async def upload_to_discord(file_path):
 
     # Compress if larger than 10MB
     if os.path.getsize(file_path) > 10 * 1024 * 1024:
+        logger.info(f"File too large, compressing: {file_path}")
         print(f"⚠️ File too large, compressing: {file_path}")
         output_file_path = os.path.join(os.path.dirname(file_path), "compressed_" + os.path.basename(file_path))
         compressed_video = compress_video(file_path, output_file_path, target_size_kb=10000)  # 10MB
         if compressed_video and os.path.exists(compressed_video):
             file_path = compressed_video
         else:
+            logger.error("Compression failed, skipping upload.")
             print("❌ Compression failed, skipping upload.")
             return
 
@@ -130,21 +157,26 @@ async def upload_to_discord(file_path):
         with open(file_path, "rb") as file:
             discord_file = discord.File(file, filename=os.path.basename(file_path))
             await channel.send(content=f"🎥 New video uploaded: `{os.path.basename(file_path)}`", file=discord_file)
+        logger.info(f"Uploaded successfully: {file_path}")    
         print(f"✅ Uploaded successfully: {file_path}")
     except Exception as e:
+        logger.error(f"Failed to upload {file_path}: {e}")
         print(f"❌ Failed to upload {file_path}: {e}")
         await channel.send(f"❌ Failed to upload `{os.path.basename(file_path)}`.")
 
 
 @client.event
 async def on_ready():
+    logger.info(f"Logged in as {client.user}")
     print(f"✅ Logged in as {client.user}")
 
     latest_video = get_latest_video(VIDEO_DIRECTORY)
     if latest_video:
+        logger.info(f"Found latest video: {latest_video}")
         print(f"📂 Found latest video: {latest_video}")
         await upload_to_discord(latest_video)
     else:
+        logger.info("No video found in directory.")
         print("❌ No video found in directory.")
 
     await client.close()  # Stop bot after execution
