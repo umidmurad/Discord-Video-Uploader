@@ -72,7 +72,8 @@ def compress_video(video_full_path, output_file_name, target_size_kb):
             '-f', 'mp4',
             'NUL' if sys.platform == "win32" else '/dev/null'
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        cwd = os.path.dirname(video_full_path)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=cwd)
 
         cmd = [
             'ffmpeg', '-i', video_full_path,
@@ -83,7 +84,8 @@ def compress_video(video_full_path, output_file_name, target_size_kb):
             '-b:a', str(audio_bitrate),
             output_file_name
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        cwd = os.path.dirname(video_full_path)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=cwd)
         logger.info(f"Compressed video saved to {output_file_name}")
         return output_file_name
 
