@@ -86,6 +86,12 @@ def compress_video(video_full_path, output_file_name, target_size_kb):
         ]
         cwd = os.path.dirname(video_full_path)
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=cwd)
+        #Check if the output file is 0kb, report failure
+        if os.path.getsize(output_file_name) == 0:
+            logger.error(f"Output file is empty: {output_file_name}")
+            print(f"❌ Output file is empty: {output_file_name}")
+            return None
+            
         logger.info(f"Compressed video saved to {output_file_name}")
         return output_file_name
 
