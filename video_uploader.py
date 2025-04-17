@@ -15,24 +15,15 @@ VIDEO_DIRECTORY  = r"C:\Users\YOUR_USERNAME\Videos\Captures"  # Change this to y
 DISCORD_BOT_TOKEN = "MY_BOT_TOKEN"  # Replace with your bot token
 DISCORD_CHANNEL_ID = MY_CHANNEL_ID  # Replace with your channel ID
 
+log_file = os.path.join(os.path.dirname(__file__), "bot.log")
+
+logging.basicConfig(
+    filename=log_file ,  # Log file name
+    level=logging.INFO,  # Logging level
+    format="%(asctime)s - %(levelname)s - %(message)s"  # Log message format
+)
+
 logger = logging.getLogger("discord_bot")
-logger.setLevel(logging.INFO)
-
-# Remove any existing handlers to avoid duplicate logs
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-# File handler (logs will be saved to 'bot.log')
-log_file = "bot.log"  # Change path if needed
-file_handler = logging.FileHandler(log_file)
-file_handler.setLevel(logging.INFO)
-
-# Log format
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-
-# Add the file handler
-logger.addHandler(file_handler)
 
 def get_latest_video(directory):
     """Finds the most recently modified video file in the given directory."""
