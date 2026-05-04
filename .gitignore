@@ -1,0 +1,15 @@
+video_uploader_config.json
+bot.log
+hotkey.log
+hotkey_child.log
+uploader.lock
+*.log
+*.pyc
+__pycache__/
+venv/
+.venv/
+ffmpeg2pass-*.log
+compressed_*.log
+compressed_*.log.mbtree
+compressed_*.mp4
+last_*s_*.mp4

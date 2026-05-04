@@ -1,0 +1,11 @@
+{
+  "video_directory": "%USERPROFILE%\\Videos\\Captures",
+  "discord_bot_token": "TOKEN_HERE",
+  "discord_channel_id": 0,
+  "max_upload_mb": 10,
+  "trim_last_seconds": 15,
+  "trim_mode": "copy",
+  "hotkey": "ALT+U",
+  "delete_processed_files": true,
+  "message": "New video uploaded:"
+}
