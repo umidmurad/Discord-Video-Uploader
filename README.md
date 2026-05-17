@@ -1,86 +1,224 @@
-# Video Uploader Discord Bot
+# Discord Video Uploader
 
-This script uploads the most recent video from a specified folder to a Discord channel. It also compresses videos larger than 10MB before uploading.
+Uploads the newest Xbox Game Bar capture from your Captures folder to a Discord channel.
 
-## Prerequisites
+## How It Works
 
-### 1. Create a Discord Bot
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Click **New Application**, name your bot, and go to the **Bot** section.
-3. Click **Add Bot** and copy the **Token** (you will need this later).
-4. Under **Privileged Gateway Intents**, enable **Message Content Intent**.
-5. Click **Save Changes**.
+Daily use is:
 
-### 2. Get Your Discord Channel ID
-1. Enable **Developer Mode** in Discord (User Settings > Advanced > Developer Mode).
-2. Right-click the channel where videos should be uploaded and select **Copy ID**.
-3. Save this ID for later use.
+1. Save a Game Bar clip with `Win + Alt + G`.
+2. Wait for the clip to finish saving.
+3. Press the configured upload hotkey, default `Alt + U`.
+4. The newest original capture is trimmed/compressed/uploaded.
+5. Temporary trim/compressed files are deleted after a successful upload.
 
-### 3. Give the Bot Required Permissions
-When adding the bot to a server, ensure it has the following permissions:
-- `Send Messages`
-- `Attach Files`
-- `Read Messages`
+The moving parts are:
 
-To generate an invite link with the necessary permissions:
-1. Go to the **OAuth2** section in the Developer Portal.
-2. Under **OAuth2 URL Generator**, select `bot` and `applications.commands`.
-3. In the **Bot Permissions** section, select `Send Messages`, `Attach Files`, and `Read Messages`.
-4. Copy and open the generated link to add the bot to your server.
+- `video_uploader.py`: performs one upload cycle, then exits.
+- `hotkey_listener.pyw`: waits quietly in the background for the hotkey.
+- `enable.ps1`: installs and starts the Windows startup task.
+- `disable.ps1`: stops the hotkey listener and removes the startup task.
+- `uninstall.ps1`: disables the hotkey and deletes private local config/log files.
 
-## Installation
+`Task Scheduler -> hotkey_listener.pyw -> video_uploader.py`
 
-### 1. Install Dependencies
-Ensure you have Python 3.12+ installed, then install the required packages:
-```bash
-pip install discord ffmpeg
-```
-You also need to install **FFmpeg**:
-- Windows: Download from [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html) and add it to your system path.
-- Linux/macOS: Install via package manager (`sudo apt install ffmpeg` or `brew install ffmpeg`).
+Keep the project files together. If you move the whole project folder after enabling startup, run `enable.ps1` again from the new folder because Task Scheduler stores the exact path.
 
-### 2. Configure the Script
-Edit the script to include your bot token and channel ID:
-```python
-DISCORD_BOT_TOKEN = "YOUR_BOT_TOKEN"
-DISCORD_CHANNEL_ID = YOUR_CHANNEL_ID
-VIDEO_DIRECTORY = r"C:\\Users\\YOUR_USERNAME\\Videos\\Captures"  # Adjust to your folder
+## Requirements
+
+- Python 3.12+
+- FFmpeg installed and available on `PATH`
+- Python packages:
+
+```powershell
+pip install discord.py ffmpeg-python
 ```
 
-### 3. Run the Bot
-```bash
+## Configure
+
+Create the private config:
+
+```powershell
+python video_uploader.py --init-config
+```
+
+If `python` is not on PATH, copy `video_uploader_config.example.json` to `video_uploader_config.json` manually.
+
+Edit `video_uploader_config.json`:
+
+```json
+{
+  "video_directory": "%USERPROFILE%\\Videos\\Captures",
+  "discord_bot_token": "YOUR_BOT_TOKEN",
+  "discord_channel_id": 0,
+  "max_upload_mb": 10,
+  "trim_last_seconds": 15,
+  "trim_mode": "copy",
+  "hotkey": "ALT+U",
+  "delete_processed_files": true,
+  "message": "New video uploaded:"
+}
+```
+
+`trim_mode` can be:
+
+- `copy`: fastest and avoids re-encoding during the trim. The start point may snap to the nearest keyframe.
+- `encode`: more exact 15 second trims, but slower and re-encodes before the size check.
+
+When `delete_processed_files` is `true`, generated trim/compressed files are deleted after a successful upload. The original Game Bar recording is kept.
+
+## Test Once
+
+Run one upload directly:
+
+```powershell
 python video_uploader.py
 ```
 
-## Running the Script with AutoHotkey
+This tests your token, channel ID, FFmpeg install, package install, and capture folder without involving the hotkey listener.
 
-To easily run the script using a keyboard shortcut:
+## Enable
 
-1. **Install AutoHotkey** from [https://www.autohotkey.com/](https://www.autohotkey.com/).
-2. **Create an AutoHotkey script (`run_video_uploader.ahk`)**:
-   - Right-click inside a folder → `New` → `AutoHotkey Script`.
-   - Open the file in Notepad and add:
-     ```ahk
-     ^!U:: ; Press Ctrl + Alt + U to run the script
-     Run, pythonw "C:\path\to\video_uploader.py"
-     return
-     ```
-     *(Replace `C:\path\to\video_uploader.py` with the actual script path.)*
-3. **Run the AutoHotkey script** by double-clicking it.
-4. Press `Ctrl + Alt + U` to start the bot.
+Run PowerShell as Administrator from this folder:
 
----
+```powershell
+powershell -ExecutionPolicy Bypass -File .\enable.ps1
+```
 
-## Notes
-- The bot only runs once per execution and uploads the latest video.
-- Large videos are automatically compressed to 10MB.
-- The bot will shut down after uploading a video.
+This creates and starts a Task Scheduler task named `Discord Video Uploader Hotkey`. The task starts `hotkey_listener.pyw` at Windows login.
+
+## Disable
+
+Run PowerShell as Administrator from this folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\disable.ps1
+```
+
+This stops this project's hotkey listener and removes the startup task. It keeps `video_uploader_config.json` and `uploader.log`.
+
+## Uninstall
+
+Run PowerShell as Administrator from this folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+```
+
+The uninstall script:
+
+- stops this project's `hotkey_listener.pyw` process
+- removes the `Discord Video Uploader Hotkey` startup task
+- deletes project-local private config, log, and lock files
+
+It does not delete the project folder, your original Xbox Game Bar recordings in `Videos\Captures`, Python, FFmpeg, or the Discord bot application from Discord's Developer Portal.
+
+## Discord Setup
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Create an application and add a bot.
+3. Copy the bot token.
+4. Invite the bot to your server with:
+   - `Send Messages`
+   - `Attach Files`
+   - `Read Messages/View Channels`
+5. Enable Discord Developer Mode, then copy the destination channel ID.
+
+## Game Bar Notes
+
+Xbox Game Bar's default "record that" shortcut is `Win + Alt + G`, which saves the last 30 seconds to `Videos\Captures`. This project does not try to control Game Bar directly. Instead, it trims the newest capture afterward, which is more reliable and keeps the upload workflow independent from the game.
 
 ## Troubleshooting
-- **Bot not responding?** Ensure the bot token is correct and the bot is in the server.
-- **Video not uploading?** Check file size and ensure it’s in the correct directory.
-- **FFmpeg errors?** Make sure FFmpeg is installed and added to the system path.
 
----
-🚀 Enjoy automated video uploads to Discord!
+### Check The Only Log
 
+Everything writes to one file:
+
+```powershell
+Get-Content -Tail 120 .\uploader.log
+```
+
+Older versions used `bot.log`, `hotkey.log`, and `hotkey_child.log`. New runs use only `uploader.log`.
+
+### Hotkey Listener Looks Like Nothing Happened
+
+This is normal. `pythonw` and `pyw` run without a console window.
+
+Check whether the listener registered:
+
+```powershell
+Get-Content -Tail 40 .\uploader.log
+```
+
+Look for:
+
+```text
+Registered hotkey: ALT+U
+```
+
+### Could Not Register Hotkey
+
+If `uploader.log` says:
+
+```text
+Could not register hotkey: ALT+U
+```
+
+another process is already using that hotkey. Most commonly, an older listener is still running.
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\disable.ps1
+powershell -ExecutionPolicy Bypass -File .\enable.ps1
+```
+
+### Hotkey Says It Launched But No Upload Happens
+
+Check:
+
+```powershell
+Get-Content -Tail 120 .\uploader.log
+```
+
+Common causes:
+
+- the virtual environment does not have `discord.py` or `ffmpeg-python`
+- FFmpeg is not on `PATH`
+- `video_uploader_config.json` is missing the bot token or channel ID
+- the newest capture is still being written
+- the configured capture folder is wrong
+
+### Startup Task Stops Working After Moving Folder
+
+Run `enable.ps1` again from the new folder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\enable.ps1
+```
+
+The task will be overwritten with the new path.
+
+### Test Without The Hotkey
+
+Run the uploader directly:
+
+```powershell
+python video_uploader.py
+```
+
+If direct upload works but the hotkey does not, the issue is in `hotkey_listener.pyw`, the venv path, or the startup task.
+
+### Check Required Packages
+
+From the activated virtual environment:
+
+```powershell
+python -c "import discord, ffmpeg; print('packages ok')"
+```
+
+Check FFmpeg:
+
+```powershell
+ffmpeg -version
+```
