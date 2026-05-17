@@ -9,8 +9,7 @@ from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / "video_uploader_config.json"
-LOG_PATH = APP_DIR / "hotkey.log"
-CHILD_LOG_PATH = APP_DIR / "hotkey_child.log"
+LOG_PATH = APP_DIR / "uploader.log"
 UPLOADER_PATH = APP_DIR / "video_uploader.py"
 
 MODIFIERS = {
@@ -92,7 +91,7 @@ def uploader_python():
         if candidate.exists() and can_run_uploader_imports(candidate):
             return str(candidate)
         logger.info("Skipping unusable Python candidate: %s", candidate)
-    return sys.executable
+    return None
 
 
 def can_run_uploader_imports(candidate):
@@ -115,8 +114,17 @@ def launch_uploader(active_process):
         return active_process
 
     python_path = uploader_python()
+    if not python_path:
+        message = (
+            "No usable Python found for the uploader. Install dependencies with "
+            "`python -m pip install discord.py ffmpeg-python` inside the project venv, "
+            "or recreate the venv and reinstall requirements."
+        )
+        logger.error(message)
+        return None
+
     logger.info("Launching uploader with %s", python_path)
-    child_log = CHILD_LOG_PATH.open("a", encoding="utf-8")
+    child_log = LOG_PATH.open("a", encoding="utf-8")
     try:
         process = subprocess.Popen(
             [python_path, str(UPLOADER_PATH)],

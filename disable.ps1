@@ -2,11 +2,6 @@ $ErrorActionPreference = "Stop"
 
 $appDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $taskName = "Discord Video Uploader Hotkey"
-$localFiles = @(
-    "video_uploader_config.json",
-    "uploader.log",
-    "uploader.lock"
-)
 
 function Test-IsAdmin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -28,7 +23,7 @@ if ($task) {
     if (-not (Test-IsAdmin)) {
         Write-Warning "The listener was stopped, but removing the startup task requires an Administrator PowerShell."
         Write-Warning "Re-run this command from an Administrator PowerShell:"
-        Write-Warning "powershell -ExecutionPolicy Bypass -File .\uninstall.ps1"
+        Write-Warning "powershell -ExecutionPolicy Bypass -File .\disable.ps1"
         exit 1
     }
 
@@ -44,13 +39,4 @@ if ($task) {
     Write-Host "Scheduled task not found: $taskName"
 }
 
-Write-Host "Deleting project-local config, logs, and lock files..."
-foreach ($fileName in $localFiles) {
-    $path = Join-Path $appDir $fileName
-    if (Test-Path -LiteralPath $path) {
-        Remove-Item -LiteralPath $path -Force
-        Write-Host "Deleted $fileName"
-    }
-}
-
-Write-Host "Uninstall cleanup complete. Project files and Game Bar captures were left untouched."
+Write-Host "Disabled Discord Video Uploader hotkey. Config and logs were kept."

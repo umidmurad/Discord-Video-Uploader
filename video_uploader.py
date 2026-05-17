@@ -16,7 +16,7 @@ import ffmpeg
 
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / "video_uploader_config.json"
-LOG_PATH = APP_DIR / "bot.log"
+LOG_PATH = APP_DIR / "uploader.log"
 LOCK_PATH = APP_DIR / "uploader.lock"
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv")
 GENERATED_PREFIXES = ("compressed_", "last_")

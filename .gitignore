@@ -1,7 +1,5 @@
 video_uploader_config.json
-bot.log
-hotkey.log
-hotkey_child.log
+uploader.log
 uploader.lock
 *.log
 *.pyc

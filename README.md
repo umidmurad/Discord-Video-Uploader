@@ -2,33 +2,27 @@
 
 Uploads the newest Xbox Game Bar capture from your Captures folder to a Discord channel.
 
-The current flow is:
-
-1. Press the configured hotkey.
-2. The newest capture is found.
-3. If configured, the clip is trimmed to the last 15 seconds.
-4. If it is still larger than the Discord limit, it is compressed.
-5. The processed clip is uploaded through your Discord bot.
-
 ## How It Works
 
-The project has three main runtime files:
-
-- `video_uploader.py`: performs one upload cycle, then exits.
-- `hotkey_listener.pyw`: runs silently in the background and launches `video_uploader.py` when the configured hotkey is pressed.
-- `install_startup_task.ps1`: creates a Windows Task Scheduler task so `hotkey_listener.pyw` starts when you log into Windows.
-
-Normal daily flow:
+Daily use is:
 
 1. Save a Game Bar clip with `Win + Alt + G`.
 2. Wait for the clip to finish saving.
 3. Press the configured upload hotkey, default `Alt + U`.
-4. The uploader trims/compresses/uploads the newest original capture.
+4. The newest original capture is trimmed/compressed/uploaded.
 5. Temporary trim/compressed files are deleted after a successful upload.
 
-`hotkey_listener.pyw` finds `video_uploader.py` in the same folder as itself. Keep the project files together.
+The moving parts are:
 
-If you move the whole project folder after installing the startup task, run `install_startup_task.ps1` again from the new folder. Task Scheduler stores the exact folder path from the time it was installed.
+- `video_uploader.py`: performs one upload cycle, then exits.
+- `hotkey_listener.pyw`: waits quietly in the background for the hotkey.
+- `enable.ps1`: installs and starts the Windows startup task.
+- `disable.ps1`: stops the hotkey listener and removes the startup task.
+- `uninstall.ps1`: disables the hotkey and deletes private local config/log files.
+
+`Task Scheduler -> hotkey_listener.pyw -> video_uploader.py`
+
+Keep the project files together. If you move the whole project folder after enabling startup, run `enable.ps1` again from the new folder because Task Scheduler stores the exact path.
 
 ## Requirements
 
@@ -40,20 +34,9 @@ If you move the whole project folder after installing the startup task, run `ins
 pip install discord.py ffmpeg-python
 ```
 
-## Discord Setup
-
-1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Create an application and add a bot.
-3. Copy the bot token.
-4. Invite the bot to your server with:
-   - `Send Messages`
-   - `Attach Files`
-   - `Read Messages/View Channels`
-5. Enable Discord Developer Mode, then copy the destination channel ID.
-
 ## Configure
 
-Run once to create your private config:
+Create the private config:
 
 ```powershell
 python video_uploader.py --init-config
@@ -84,45 +67,39 @@ Edit `video_uploader_config.json`:
 
 When `delete_processed_files` is `true`, generated trim/compressed files are deleted after a successful upload. The original Game Bar recording is kept.
 
-## Run Once
+## Test Once
+
+Run one upload directly:
 
 ```powershell
 python video_uploader.py
 ```
 
-This is useful for testing your token, channel ID, FFmpeg install, and capture folder.
+This tests your token, channel ID, FFmpeg install, package install, and capture folder without involving the hotkey listener.
 
-## Silent Hotkey
+## Enable
 
-`hotkey_listener.pyw` replaces AutoHotkey. It registers the configured global hotkey, then runs `video_uploader.py` silently when pressed.
-
-Start it manually:
+Run PowerShell as Administrator from this folder:
 
 ```powershell
-pythonw hotkey_listener.pyw
+powershell -ExecutionPolicy Bypass -File .\enable.ps1
 ```
 
-If your Python install uses the Windows launcher:
+This creates and starts a Task Scheduler task named `Discord Video Uploader Hotkey`. The task starts `hotkey_listener.pyw` at Windows login.
+
+## Disable
+
+Run PowerShell as Administrator from this folder:
 
 ```powershell
-pyw hotkey_listener.pyw
+powershell -ExecutionPolicy Bypass -File .\disable.ps1
 ```
 
-`pythonw` and `pyw` do not print anything to PowerShell. If the listener started correctly, PowerShell will simply return to the prompt. Check `hotkey.log` for `Registered hotkey`.
-
-## Start At Login
-
-Run PowerShell from this folder:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install_startup_task.ps1
-```
-
-This creates and starts a Task Scheduler task named `Discord Video Uploader Hotkey`. It launches `hotkey_listener.pyw` at login without a console window.
+This stops this project's hotkey listener and removes the startup task. It keeps `video_uploader_config.json` and `uploader.log`.
 
 ## Uninstall
 
-Run PowerShell from this folder:
+Run PowerShell as Administrator from this folder:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
@@ -132,17 +109,20 @@ The uninstall script:
 
 - stops this project's `hotkey_listener.pyw` process
 - removes the `Discord Video Uploader Hotkey` startup task
-- deletes project-local private config, logs, and lock files
+- deletes project-local private config, log, and lock files
 
 It does not delete the project folder, your original Xbox Game Bar recordings in `Videos\Captures`, Python, FFmpeg, or the Discord bot application from Discord's Developer Portal.
 
-Manual fallback:
+## Discord Setup
 
-```powershell
-Stop-Process -Name pythonw -Force -ErrorAction SilentlyContinue
-Unregister-ScheduledTask -TaskName "Discord Video Uploader Hotkey" -Confirm:$false
-Remove-Item .\video_uploader_config.json, .\bot.log, .\hotkey.log, .\hotkey_child.log, .\uploader.lock -Force -ErrorAction SilentlyContinue
-```
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Create an application and add a bot.
+3. Copy the bot token.
+4. Invite the bot to your server with:
+   - `Send Messages`
+   - `Attach Files`
+   - `Read Messages/View Channels`
+5. Enable Discord Developer Mode, then copy the destination channel ID.
 
 ## Game Bar Notes
 
@@ -150,14 +130,24 @@ Xbox Game Bar's default "record that" shortcut is `Win + Alt + G`, which saves t
 
 ## Troubleshooting
 
+### Check The Only Log
+
+Everything writes to one file:
+
+```powershell
+Get-Content -Tail 120 .\uploader.log
+```
+
+Older versions used `bot.log`, `hotkey.log`, and `hotkey_child.log`. New runs use only `uploader.log`.
+
 ### Hotkey Listener Looks Like Nothing Happened
 
-This is normal when using `pythonw` or `pyw`. They run without a console window.
+This is normal. `pythonw` and `pyw` run without a console window.
 
 Check whether the listener registered:
 
 ```powershell
-Get-Content -Tail 40 .\hotkey.log
+Get-Content -Tail 40 .\uploader.log
 ```
 
 Look for:
@@ -168,7 +158,7 @@ Registered hotkey: ALT+U
 
 ### Could Not Register Hotkey
 
-If `hotkey.log` says:
+If `uploader.log` says:
 
 ```text
 Could not register hotkey: ALT+U
@@ -176,24 +166,19 @@ Could not register hotkey: ALT+U
 
 another process is already using that hotkey. Most commonly, an older listener is still running.
 
-Stop this project's listener:
+Run:
 
 ```powershell
-Get-CimInstance Win32_Process -Filter "Name = 'pythonw.exe'" |
-  Where-Object { $_.CommandLine -like "*hotkey_listener.pyw*" } |
-  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+powershell -ExecutionPolicy Bypass -File .\disable.ps1
+powershell -ExecutionPolicy Bypass -File .\enable.ps1
 ```
-
-Then start the listener again.
 
 ### Hotkey Says It Launched But No Upload Happens
 
-Check the logs:
+Check:
 
 ```powershell
-Get-Content -Tail 80 .\hotkey.log
-Get-Content -Tail 80 .\hotkey_child.log
-Get-Content -Tail 80 .\bot.log
+Get-Content -Tail 120 .\uploader.log
 ```
 
 Common causes:
@@ -206,10 +191,10 @@ Common causes:
 
 ### Startup Task Stops Working After Moving Folder
 
-Run the installer again from the new folder:
+Run `enable.ps1` again from the new folder:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install_startup_task.ps1
+powershell -ExecutionPolicy Bypass -File .\enable.ps1
 ```
 
 The task will be overwritten with the new path.
@@ -237,9 +222,3 @@ Check FFmpeg:
 ```powershell
 ffmpeg -version
 ```
-
-## Logs
-
-- `bot.log`: upload, trim, compression, and Discord errors
-- `hotkey.log`: hotkey listener startup and launch errors
-- `hotkey_child.log`: uploader errors from hotkey-launched runs
