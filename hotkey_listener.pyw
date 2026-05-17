@@ -1,3 +1,9 @@
+"""Silent Windows hotkey listener for Discord Video Uploader.
+
+The listener registers the configured global hotkey and launches
+video_uploader.py whenever that hotkey is pressed.
+"""
+
 import ctypes
 import ctypes.wintypes
 import json
@@ -7,11 +13,13 @@ import sys
 from pathlib import Path
 
 
+# Project-local paths. The listener and uploader are expected to stay together.
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / "video_uploader_config.json"
 LOG_PATH = APP_DIR / "uploader.log"
 UPLOADER_PATH = APP_DIR / "video_uploader.py"
 
+# Windows RegisterHotKey modifier constants.
 MODIFIERS = {
     "ALT": 0x0001,
     "CTRL": 0x0002,
@@ -21,6 +29,7 @@ MODIFIERS = {
     "WINDOWS": 0x0008,
 }
 
+# Common non-letter keys accepted in the config hotkey.
 VK_KEYS = {
     "F1": 0x70,
     "F2": 0x71,
@@ -39,6 +48,7 @@ VK_KEYS = {
 }
 
 
+# Share the same log file as the uploader so troubleshooting has one place to look.
 logging.basicConfig(
     filename=LOG_PATH,
     level=logging.INFO,
@@ -48,6 +58,7 @@ logger = logging.getLogger("discord_video_hotkey")
 
 
 def load_hotkey():
+    """Read the hotkey from config, falling back to Alt+U."""
     if not CONFIG_PATH.exists():
         return "ALT+U"
     with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
@@ -56,6 +67,7 @@ def load_hotkey():
 
 
 def parse_hotkey(hotkey):
+    """Convert a string like ALT+U into Windows modifier and key codes."""
     parts = [part.strip().upper() for part in hotkey.replace("-", "+").split("+") if part.strip()]
     if len(parts) < 2:
         raise ValueError("Hotkey must include at least one modifier and one key, for example ALT+U.")
@@ -78,10 +90,12 @@ def parse_hotkey(hotkey):
 
 
 def creation_flags():
+    """Hide child Python console windows on Windows."""
     return subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 def uploader_python():
+    """Find a Python executable that can import the uploader dependencies."""
     candidates = [
         APP_DIR / "venv" / "Scripts" / "python.exe",
         APP_DIR / ".venv" / "Scripts" / "python.exe",
@@ -95,6 +109,7 @@ def uploader_python():
 
 
 def can_run_uploader_imports(candidate):
+    """Check whether a Python executable can import required packages."""
     try:
         result = subprocess.run(
             [str(candidate), "-c", "import discord, ffmpeg"],
@@ -109,6 +124,7 @@ def can_run_uploader_imports(candidate):
 
 
 def launch_uploader(active_process):
+    """Start one upload job unless the previous one is still running."""
     if active_process and active_process.poll() is None:
         logger.info("Upload already running; ignoring hotkey press.")
         return active_process
@@ -124,6 +140,9 @@ def launch_uploader(active_process):
         return None
 
     logger.info("Launching uploader with %s", python_path)
+
+    # The uploader is normally silent. Any unexpected stdout/stderr is appended
+    # to the shared log so failed hotkey launches are still visible.
     child_log = LOG_PATH.open("a", encoding="utf-8")
     try:
         process = subprocess.Popen(
@@ -141,6 +160,7 @@ def launch_uploader(active_process):
 
 
 def main():
+    """Register the global hotkey and run the Windows message loop."""
     hotkey = load_hotkey()
     modifiers, key_code = parse_hotkey(hotkey)
     hotkey_id = 1
@@ -154,6 +174,7 @@ def main():
     active_process = None
 
     try:
+        # Windows delivers WM_HOTKEY messages to this process after registration.
         while user32.GetMessageW(ctypes.byref(message), None, 0, 0) != 0:
             if message.message == 0x0312 and message.wParam == hotkey_id:
                 active_process = launch_uploader(active_process)
