@@ -347,11 +347,12 @@ def compress_video(video_path, target_size_bytes):
     return output_path
 
 
-async def upload_to_discord(file_path, config):
+async def upload_to_discord(file_path, config, display_filename=None):
     """Connect a bot client, upload one file, then close the client."""
     intents = discord.Intents.default()
     client = discord.Client(intents=intents)
     upload_result = {"uploaded": False}
+    upload_filename = display_filename or os.path.basename(file_path)
 
     @client.event
     async def on_ready():
@@ -362,9 +363,9 @@ async def upload_to_discord(file_path, config):
                 raise RuntimeError("Could not find Discord channel.")
 
             with open(file_path, "rb") as file:
-                discord_file = discord.File(file, filename=os.path.basename(file_path))
+                discord_file = discord.File(file, filename=upload_filename)
                 await channel.send(
-                    content=f"{config['message']} `{os.path.basename(file_path)}`",
+                    content=f"{config['message']} `{upload_filename}`",
                     file=discord_file,
                 )
             upload_result["uploaded"] = True
@@ -393,6 +394,7 @@ async def process_latest_video(config):
 
     original_video = latest_video
     working_video = sanitize_filename(latest_video)
+    display_filename = os.path.basename(working_video)
     generated_files = []
 
     try:
@@ -411,7 +413,7 @@ async def process_latest_video(config):
                 f"Processed file is still larger than {config['max_upload_mb']} MB: {working_video}"
             )
 
-        uploaded = await upload_to_discord(working_video, config)
+        uploaded = await upload_to_discord(working_video, config, display_filename)
         if uploaded and config["delete_processed_files"]:
             clean_generated_files(generated_files)
         return uploaded
